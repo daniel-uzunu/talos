@@ -1,0 +1,2 @@
+# talos
+Scala validation library
