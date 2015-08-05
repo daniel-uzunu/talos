@@ -25,4 +25,17 @@ val userConstraint = NonEmptyConstraint[User](Member("email"))
 val userConstraint = SomeConstraint[User](u => u.name != "" && u.isMarried && u.email != "")
 
 val blogPostConstraint = SomeConstraint[BlogPost](p => p.title != "" && p.author respects userConstraint)
+
+val userConstraint = m(_.name) != "" && m(_.email) != ""
+
+// should I use implicits?
+/*implicit*/ object UserConstraint extends SomeConstraint[User] {
+  override val constraint = m(_.name) != "" && m(_.email) != ""
+}
+
+trait SomeConstraint[B] {
+  abstract val constraint: Constraint[B]
+  def m(fn: (obj: B) => String): Member[B] = macro ???
+  def m[A](fn: (obj: B) => A): Member[B] = macro ???
+}
 ```
