@@ -1,16 +1,16 @@
 package talos
 
-import Macros._
+//import Macros._
 
 object Test {
 
   def main(args: Array[String]): Unit = {
     println("test")
 
-    assert(4 > 3, "aaa")
+    //assert(4 > 3, "aaa")
   }
 
-  case class Person(firstName: String, lastName: String, email: String)
+  /*case class Person(firstName: String, lastName: String, email: String)
 
   case class Book(title: String, author: Person, year: Int, isbn: String)
 
@@ -36,7 +36,7 @@ object Test {
     val bookConstraint = constraint[Book] { b =>
       b.title != "" && b.year > 2000
     }
-  }
+  }*/
 
   // def validate[A](obj: A)(implicit constraints: Constraints): Result
 }

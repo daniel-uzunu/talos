@@ -25,32 +25,24 @@ object BuildSettings {
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-target:jvm-1.7"))
 }
 
-object ReactiveMongoBuild extends Build {
+object TalosBuild extends Build {
 
   import BuildSettings._
   import Resolvers._
   import Dependencies._
 
-  lazy val reactivemongo = Project(
+  lazy val root = Project(
       "talos-root",
       file("."),
       settings = buildSettings
-  ).aggregate(core, macros, example)
+  ).aggregate(core, example)
 
   lazy val core = Project(
     "talos",
     file("core"),
     settings = buildSettings ++ Seq(
       resolvers := resolversList,
-      libraryDependencies ++= Seq(scalaTest))
-  ).dependsOn(macros)
-
-  lazy val macros = Project(
-    "talos-macros",
-    file("macros"),
-    settings = buildSettings ++ Seq(
-      resolvers := resolversList,
-      libraryDependencies ++= Seq(scalaCompiler, scalaReflect))
+      libraryDependencies ++= Seq(scalaTest, scalaCompiler, scalaReflect))
   )
 
   lazy val example = Project(
