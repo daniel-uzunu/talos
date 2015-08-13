@@ -5,6 +5,39 @@ Talos is a Scala validation library in which the validation rules are stored as 
 Example:
 
 ```scala
+trait DefaultConstraints {
+  def constraint[T](fn: T => Boolean): Constraint[T] = ???
+
+  def isValid[T](obj: T)(implicit constraint: Constraint[T]): Boolean = ???
+  def isValid[T](obj: Option[T])(implicit constraint: Constraint[T]): Boolean = ???
+  def isEmail(s: String): Boolean = ???
+}
+
+object DefaultConstraints extends DefaultConstraints
+```
+
+```scala
+case class StringMember[T](name: String, clazz: Class[T]) extends Member[T, String](name, clazz)
+
+case class NotEmptyConstraint[T](member: StringMember[T]) extends Constraint[T]
+```
+
+```scala
+case class User(name: String, givenName: String, familyName: String, email: String, isMarried: Boolean)
+case class BlogPost(title: String, author: User)
+
+object MyConstraints extends DefaultConstraints {
+  val userConstraint = constraint[User] { user =>
+    user.name != "" && isEmail(user.email)
+  }
+
+  val blogPostConstraint = constraint[BlogPost] { post =>
+    post.title != "" && isValid(post.author)
+  }
+}
+```
+
+```scala
 trait Constraint[A]
 
 case class NonEmptyConstraint[A] (member: Member[String]) extends Constraint[A]
