@@ -27,11 +27,11 @@ case class User(name: String, givenName: String, familyName: String, email: Stri
 case class BlogPost(title: String, author: User)
 
 object MyConstraints extends DefaultConstraints {
-  val userConstraint = constraint[User] { user =>
+  implicit val userConstraint = constraint[User] { user =>
     user.name != "" && isEmail(user.email)
   }
 
-  val blogPostConstraint = constraint[BlogPost] { post =>
+  implicit val blogPostConstraint = constraint[BlogPost] { post =>
     post.title != "" && isValid(post.author)
   }
 }
