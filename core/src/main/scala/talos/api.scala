@@ -1,21 +1,25 @@
 package talos
 
 import scala.language.experimental.macros
-import scala.reflect.ClassTag
+import scala.language.implicitConversions
+import scala.reflect.runtime.universe._
 
 sealed trait Result
 
 case object Success extends Result
 case object Failure extends Result
 
-trait Constraint[T] {
-  def tag: ClassTag[T]
+case class Member[A <: AnyRef, B](name: String, declaringClass: Class[A], memberType: Class[B])
+
+sealed trait Constraint[T] {}
+
+case class NotEmptyConstraint[T <:  AnyRef](member: Member[T, String]) extends Constraint[T]
+
+trait DefaultConstraints {
+  def constraint[T <: AnyRef](fn: T => Constraint[T]): Constraint[T] = fn(null.asInstanceOf[T])
+
+  implicit def toConstraint[T <: AnyRef : TypeTag](expr: => Boolean): Constraint[T] =
+    NotEmptyConstraint[T](Member("firstName", typeOf[T].getClass.asInstanceOf[Class[T]], classOf[String]))
 }
 
-case class NotEmptyConstraint[T](fieldName: String)(implicit val tag: ClassTag[T]) extends Constraint[T]
-
-abstract class Constraints {
-  def constraints: List[Constraint[_]]
-
-  def constraint[T](fn: T => Boolean): Constraint[T] = macro Macros.constraintImpl[T]
-}
+object DefaultConstraints extends DefaultConstraints

@@ -6,11 +6,13 @@ Example:
 
 ```scala
 trait DefaultConstraints {
-  def constraint[T](fn: T => Boolean): Constraint[T] = ???
+  def constraint[T](fn: T => Constraint[T]): Constraint[T] = ???
 
-  def isValid[T](obj: T)(implicit constraint: Constraint[T]): Boolean = ???
-  def isValid[T](obj: Option[T])(implicit constraint: Constraint[T]): Boolean = ???
-  def isEmail(s: String): Boolean = ???
+  def isValid[T](obj: T)(implicit constraint: Constraint[T]): Constraint[T] = ???
+  def isValid[T](obj: Option[T])(implicit constraint: Constraint[T]): Constraint[T] = ???
+  def isEmail(s: String): Constraint[T] = ???
+
+  implicit def toConstraint(expr: Boolean): Constraint[T] = ???
 }
 
 object DefaultConstraints extends DefaultConstraints
