@@ -35,25 +35,30 @@ class TestSpec extends FunSpec with Matchers {
   case class BankAccount(name: String, amount: Int) {
     def convert(rate: Double): Double = amount * rate
 
+    var d = "sss"
+
     def test: String = {
       println("aaa")
       name
     }
+
+    def `a-b`: String = "a"
   }
 
   describe("get value reflection") {
-    val account = BankAccount("main", 1000)
+    val account = new BankAccount("main", 1000)
 
-    import Macro.getValue
+    import JavaReflection.getValue
 
     it("should return the value for case class field") {
-      getValue[BankAccount, String](account, "name") shouldEqual "main"
-      getValue[BankAccount, Int](account, "amount") shouldEqual 1000
-      getValue[BankAccount, String](account, "toString") shouldEqual "BankAccount(main,1000)"
+      getValue(account, "name") shouldEqual "main"
+      getValue(account, "amount") shouldEqual 1000
+      getValue(account, "toString") should not equal "BankAccount(main,1001)"
+      getValue(account, "d") shouldEqual "sss"
 
       val s = "test"
-      getValue[BankAccount, String](account, s) shouldEqual "main"
-      getValue[BankAccount, String](account, s) shouldEqual "main"
+      getValue(account, s) shouldEqual "main"
+      getValue(account, s) shouldEqual "main"
     }
 
     it("should fail") {

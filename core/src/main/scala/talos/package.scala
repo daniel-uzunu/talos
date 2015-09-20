@@ -1,7 +1,3 @@
-import scala.reflect.ClassTag
-import scala.reflect.macros.blackbox
-import scala.language.experimental.macros
-import scala.reflect.runtime.{universe => ru}
 
 package object talos {
 
@@ -20,38 +16,44 @@ package object talos {
     }
   }
 
-  object Reflection {
-    def getValue[T: ru.TypeTag : ClassTag, S](obj: T, memberName: String): S = {
-      val objType = ru.typeTag[T].tpe
-      val termSymbol = objType.member(ru.TermName(memberName)).asMethod
+  object JavaReflection {
+    def getValue[T](obj: T, methodName: String): Any = {
+      val method = obj.getClass.getMethod(methodName)
+      method.invoke(obj)
+    }
+  }
 
-      val m = ru.runtimeMirror(obj.getClass.getClassLoader)
+  object ScalaReflection {
+    import scala.reflect.ClassTag
+    import scala.reflect.runtime.universe._
+
+    def getValue[T: TypeTag : ClassTag](obj: T, methodName: String): Any = {
+      val symbol = typeOf[T].member(TermName(methodName)).asMethod
+
+      val m = runtimeMirror(obj.getClass.getClassLoader)
       val im = m.reflect(obj)
 
-      im.reflectMethod(termSymbol).apply().asInstanceOf[S]
+      im.reflectMethod(symbol).apply()
     }
   }
 
   object Macro {
-    def getValue[T, S](obj: T, memberName: String): S = macro impl[T, S]
+    import scala.reflect.macros.blackbox
+    import scala.language.experimental.macros
 
-    def impl[T: c.WeakTypeTag, S: c.WeakTypeTag](c: blackbox.Context)(obj: c.Tree, memberName: c.Tree): c.Tree = {
+    def getValue[T](obj: T, methodName: String): Any = macro impl[T]
+
+    def impl[T: c.WeakTypeTag](c: blackbox.Context)(obj: c.Tree, methodName: c.Tree): c.Tree = {
       import c.universe._
 
-      val objType = weakTypeOf[T]
-      val memberType = weakTypeOf[S]
-
-      memberName match {
-        case Literal(Constant(constantMemberName: String)) =>
-          q"$obj.${TermName(constantMemberName)}"
-        case _ =>
-          q"""
-            Map[String, () => Any](
-              "test" -> $obj.test _,
-              "amount" -> $obj.amount _
-            )($memberName).apply().asInstanceOf[$memberType]
-          """
+      val selectedMembers = weakTypeOf[T].members.filter { member =>
+        member.isPublic && !member.isConstructor && !member.typeSignature.takesTypeArgs &&
+          (member.typeSignature.paramLists.isEmpty || member.typeSignature.paramLists.head.isEmpty)
       }
+
+      val mappings = selectedMembers.map(member => q"${member.name.decodedName.toString} -> $obj.$member _")
+
+      q"Map(..$mappings)($methodName)()"
     }
   }
 }
