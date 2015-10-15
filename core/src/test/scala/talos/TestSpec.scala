@@ -3,14 +3,16 @@ package talos
 import org.scalatest.{Matchers, FunSpec}
 
 class TestSpec extends FunSpec with Matchers {
-  case class Person(firstName: String, lastName: String)
+  case class Person(firstName: String, lastName: String, age: Int = 18)
   case class Post(title: String, author: Person)
+
+  case class Account(currency: String, amount: Double)
 
   describe("Simple Validations") {
 
     object MyConstraints extends DefaultConstraints {
       implicit val personConstraint = constraint[Person] { p =>
-        p.firstName != ""
+        p.firstName != "" && p.lastName != "" && p.age > 0 && (p.age < 20 || p.age > 50)
       }
 
       implicit val postConstraint = constraint[Post] { p =>
@@ -20,50 +22,54 @@ class TestSpec extends FunSpec with Matchers {
 
     import MyConstraints._
 
-
     ignore("should generate a constraint") {
-      personConstraint shouldEqual NotEmptyConstraint[Person](Member("firstName", classOf[Person], classOf[String]))
-      //postConstraint shouldEqual NotEmptyConstraint[Post]("title")
+      personConstraint shouldEqual AndConstraint(
+        NotEmptyConstraint[Person]("firstName"),
+        NotEmptyConstraint[Person]("lastName"))
+      postConstraint shouldEqual NotEmptyConstraint[Post]("title")
     }
 
     it("should check for empty strings") {
       validate(Person("John", "Doe")) shouldEqual Success
       validate(Person("", "Doe")) shouldEqual Failure
+      validate(Person("John", "")) shouldEqual Failure
+      validate(Person("John", "Doe", 30)) shouldEqual Failure
     }
   }
 
-  case class BankAccount(name: String, amount: Int) {
-    def convert(rate: Double): Double = amount * rate
+  describe("null checks") {}
 
-    var d = "sss"
+  describe("String validations") {
+    import DefaultConstraints._
 
-    def test: String = {
-      println("aaa")
-      name
+    it("should check for empty strings") {
+      implicit val c = constraint[Person](p => p.firstName != "")
+
+      validate(Person("John", "Doe")) shouldEqual Success
+      validate(Person("John", "")) shouldEqual Success
+      validate(Person("", "Doe")) shouldEqual Failure
     }
-
-    def `a-b`: String = "a"
   }
 
-  describe("get value reflection") {
-    val account = new BankAccount("main", 1000)
+  describe("Numeric validations") {
+    import DefaultConstraints._
 
-    import JavaReflection.getValue
+    it("should enforce greater than constraints on numeric values") {
+      implicit val c = constraint[Account](a => a.amount > 100.5)
 
-    it("should return the value for case class field") {
-      getValue(account, "name") shouldEqual "main"
-      getValue(account, "amount") shouldEqual 1000
-      getValue(account, "toString") should not equal "BankAccount(main,1001)"
-      getValue(account, "d") shouldEqual "sss"
-
-      val s = "test"
-      getValue(account, s) shouldEqual "main"
-      getValue(account, s) shouldEqual "main"
+      validate(Account("EUR", 450.8)) shouldEqual Success
+      validate(Account("USD", 98.9)) shouldEqual Failure
     }
 
-    it("should fail") {
-      // TODO: throw better exception
-      //an [IndexOutOfBoundsException] should be thrownBy getValue(account, "convert")
+    it("should enforce greater than constraints on numeric values 2") {
+      implicit val c = constraint[Account](a => a.amount > 100)
+
+      validate(Account("EUR", 450.8)) shouldEqual Success
+      validate(Account("USD", 98.9)) shouldEqual Failure
     }
+  }
+
+  describe("Composite validations") {
+
   }
 }

@@ -1,59 +1,66 @@
-
 package object talos {
-
-  def validate[A <: AnyRef](obj: A)(implicit constraint: Constraint[A]): Result = {
-
-    // TODO: I should use macros instead of reflection
-    def getValue[T](obj: AnyRef, fieldName: String): T = {
-      val field = obj.getClass.getDeclaredField(fieldName)
-      field.setAccessible(true)
-      field.get(obj).asInstanceOf[T]
-    }
-
+  def validate[T](obj: T)(implicit constraint: Constraint[T], validatable: Validatable[T]): Result = {
     constraint match {
-      case NotEmptyConstraint(field) =>
-        if (getValue[String](obj, field.name) != "") Success else Failure
+      case c: MemberConstraint[T] => memberConstraint(validatable.getValue(obj, c.memberName), c)
+
+      case AndConstraint(c1, c2) => validate(obj)(c1, validatable) && validate(obj)(c2, validatable)
+      case OrConstraint(c1, c2) => validate(obj)(c1, validatable) || validate(obj)(c2, validatable)
     }
   }
 
-  object JavaReflection {
-    def getValue[T](obj: T, methodName: String): Any = {
-      val method = obj.getClass.getMethod(methodName)
-      method.invoke(obj)
+  private def memberConstraint[T](value: Any, constraint: MemberConstraint[T]): Result = {
+    constraint match {
+      case NotEmptyConstraint(_) => value != ""
+      case RelationalConstraint(_, num, op) => relationalConstraint(value.asInstanceOf[AnyVal], num, op)
     }
   }
 
-  object ScalaReflection {
-    import scala.reflect.ClassTag
-    import scala.reflect.runtime.universe._
+  private def relationalConstraint(value: AnyVal, num: AnyVal, op: RelationalOp): Result = {
+    import NumberOrdering._
 
-    def getValue[T: TypeTag : ClassTag](obj: T, methodName: String): Any = {
-      val symbol = typeOf[T].member(TermName(methodName)).asMethod
-
-      val m = runtimeMirror(obj.getClass.getClassLoader)
-      val im = m.reflect(obj)
-
-      im.reflectMethod(symbol).apply()
+    op match {
+      case LessThan           => value < num
+      case LessThanOrEqual    => value <= num
+      case GreaterThan        => value > num
+      case GreaterThanOrEqual => value >= num
+      case Equal              => value == num
+      case NotEqual           => value != num
     }
   }
 
-  object Macro {
-    import scala.reflect.macros.blackbox
-    import scala.language.experimental.macros
+  private object NumberOrdering extends Ordering[AnyVal] {
+    override def compare(x: AnyVal, y: AnyVal) = (x, y) match {
+      case (x: Short, y: Short)   => Ordering.Short.compare(x, y)
+      case (x: Short, y: Int)     => Ordering.Int.compare(x, y)
+      case (x: Short, y: Long)    => Ordering.Long.compare(x, y)
+      case (x: Short, y: Float)   => Ordering.Float.compare(x, y)
+      case (x: Short, y: Double)  => Ordering.Double.compare(x, y)
 
-    def getValue[T](obj: T, methodName: String): Any = macro impl[T]
+      case (x: Int, y: Short)     => Ordering.Int.compare(x, y)
+      case (x: Int, y: Int)       => Ordering.Int.compare(x, y)
+      case (x: Int, y: Long)      => Ordering.Long.compare(x, y)
+      case (x: Int, y: Float)     => Ordering.Float.compare(x, y)
+      case (x: Int, y: Double)    => Ordering.Double.compare(x, y)
 
-    def impl[T: c.WeakTypeTag](c: blackbox.Context)(obj: c.Tree, methodName: c.Tree): c.Tree = {
-      import c.universe._
+      case (x: Long, y: Short)    => Ordering.Long.compare(x, y)
+      case (x: Long, y: Int)      => Ordering.Long.compare(x, y)
+      case (x: Long, y: Long)     => Ordering.Long.compare(x, y)
+      case (x: Long, y: Float)    => Ordering.Float.compare(x, y)
+      case (x: Long, y: Double)   => Ordering.Double.compare(x, y)
 
-      val selectedMembers = weakTypeOf[T].members.filter { member =>
-        member.isPublic && !member.isConstructor && !member.typeSignature.takesTypeArgs &&
-          (member.typeSignature.paramLists.isEmpty || member.typeSignature.paramLists.head.isEmpty)
-      }
+      case (x: Float, y: Short)   => Ordering.Float.compare(x, y)
+      case (x: Float, y: Int)     => Ordering.Float.compare(x, y)
+      case (x: Float, y: Long)    => Ordering.Float.compare(x, y)
+      case (x: Float, y: Float)   => Ordering.Float.compare(x, y)
+      case (x: Float, y: Double)  => Ordering.Double.compare(x, y)
 
-      val mappings = selectedMembers.map(member => q"${member.name.decodedName.toString} -> $obj.$member _")
+      case (x: Double, y: Short)  => Ordering.Double.compare(x, y)
+      case (x: Double, y: Int)    => Ordering.Double.compare(x, y)
+      case (x: Double, y: Long)   => Ordering.Double.compare(x, y)
+      case (x: Double, y: Float)  => Ordering.Double.compare(x, y)
+      case (x: Double, y: Double) => Ordering.Double.compare(x, y)
 
-      q"Map(..$mappings)($methodName)()"
+      case (_, _)                 => throw new RuntimeException("Not numeric")
     }
   }
 }
