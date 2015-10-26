@@ -20,72 +20,104 @@ case object Failure extends Result {
   def ||(other: => Result) = other
 }
 
-sealed trait RelationalOp
+sealed trait Constraint[T] {
+  def verify(map: Map[String, () => Any]): Result
 
-case object LessThan extends RelationalOp
-case object LessThanOrEqual extends RelationalOp
-case object GreaterThan extends RelationalOp
-case object GreaterThanOrEqual extends RelationalOp
-case object Equal extends RelationalOp
-case object NotEqual extends RelationalOp
-
-sealed trait Constraint[T]
-
-sealed trait MemberConstraint[T] extends Constraint[T] {
-  def memberName: String
+  def &&(other: Constraint[T]): Constraint[T] = AndConstraint(this, other)
+  def ||(other: Constraint[T]): Constraint[T] = OrConstraint(this, other)
 }
 
-case class NotEmptyConstraint[T](memberName: String) extends MemberConstraint[T]
+sealed trait MemberConstraint[T, U] extends Constraint[T] {
+  def memberName: String
+  override def verify(map: Map[String, () => Any]) = verify(map(memberName)().asInstanceOf[U])
+  def verify(value: U): Result
+}
 
-case class RelationalConstraint[T](memberName: String, num: AnyVal, op: RelationalOp) extends MemberConstraint[T]
+case class NotEmptyConstraint[T](memberName: String) extends MemberConstraint[T, String] {
+  override def verify(value: String) = value != ""
+}
 
-case class AndConstraint[T](c1: Constraint[T], c2: Constraint[T]) extends Constraint[T]
-case class OrConstraint[T](c1: Constraint[T], c2: Constraint[T]) extends Constraint[T]
+case class RangeConstraint[T, N: Numeric](memberName: String, min: Option[N], max: Option[N], step: Option[N])
+  extends MemberConstraint[T, N] {
 
-object Constraint {
-  import scala.language.experimental.macros
-  import scala.reflect.macros.blackbox
+  import Ordering.Implicits._
+  import Numeric.Implicits._
 
-  implicit def toConstraint[T](expr: Boolean): Constraint[T] = macro toConstraintImpl[T]
+  override def verify(value: N) = verifyMin(value) && verifyMax(value) && verifyStep(value)
 
-  def toConstraintImpl[T: c.WeakTypeTag](c: blackbox.Context)(expr: c.Tree): c.Tree = {
-    import c.universe._
+  private def verifyMin(value: N) = min.isEmpty || value >= min.get
 
-    val tpe = weakTypeOf[T]
+  private def verifyMax(value: N) = max.isEmpty || value <= max.get
 
-    expr match {
-      case q""" $obj.$memberName != "" """ =>
-        q"NotEmptyConstraint[$tpe](${memberName.decodedName.toString})"
-
-      case q"$obj.$memberName > $value" =>
-        q"RelationalConstraint[$tpe](${memberName.decodedName.toString}, $value, GreaterThan)"
-      case q"$obj.$memberName < $value" =>
-        q"RelationalConstraint[$tpe](${memberName.decodedName.toString}, $value, LessThan)"
-
-      case q"$expr1 && $expr2" =>
-        q"AndConstraint(${toConstraintImpl(c)(expr1)}, ${toConstraintImpl(c)(expr2)})"
-      case q"$expr1 || $expr2" =>
-        q"OrConstraint(${toConstraintImpl(c)(expr1)}, ${toConstraintImpl(c)(expr2)})"
-    }
+  private def verifyStep(value: N) = {
+    step.isEmpty || (implicitly[Numeric[N]] match {
+      case num: Integral[N] => num.mkNumericOps(value - min.get) % step.get == 0
+      case num: Fractional[N] => (value - min.get).toDouble() % step.get.toDouble() == 0
+    })
   }
 }
 
+case class AndConstraint[T](c1: Constraint[T], c2: Constraint[T]) extends Constraint[T] {
+  override def verify(map: Map[String, () => Any]) = c1.verify(map) && c2.verify(map)
+}
+case class OrConstraint[T](c1: Constraint[T], c2: Constraint[T]) extends Constraint[T] {
+  override def verify(map: Map[String, () => Any]) = c1.verify(map) || c2.verify(map)
+}
+
+case class StringWrapper[T](memberName: String) {
+  def isRequired: Constraint[T] = NotEmptyConstraint(memberName)
+}
+
+case class NumericWrapper[T, N: Numeric](memberName:  String) {
+  def isInRange(min: N, max: N, step: N): Constraint[T] = RangeConstraint(memberName, Some(min), Some(max), Some(step))
+  def isInRange(min: N, max: N): Constraint[T] = RangeConstraint(memberName, Some(min), Some(max), None)
+  def minValue(min: N): Constraint[T] = RangeConstraint(memberName, Some(min), None, None)
+  def maxValue(max: N): Constraint[T] = RangeConstraint(memberName, None, Some(max), None)
+}
+
 trait DefaultConstraints {
-  def constraint[T >: Null](fn: T => Constraint[T]): Constraint[T] = fn(null)
-}
-
-object DefaultConstraints extends DefaultConstraints
-
-trait Validatable[T] {
-  def getValue(obj: T, memberName: String): Any
-}
-
-object Validatable {
   import scala.reflect.macros.blackbox
   import scala.language.experimental.macros
 
-  implicit def materialize[T]: Validatable[T] = macro materializeImpl[T]
+  def constraint[T >: Null](fn: T => Constraint[T]): Constraint[T] = fn(null)
 
+  implicit def toStringWrapper[T](value: String): StringWrapper[T] = macro DefaultConstraints.toStringWrapperImpl[T]
+
+  implicit def toNumericWrapper[T, N](value: N)(implicit ev: Numeric[N]): NumericWrapper[T, N] =
+    macro DefaultConstraints.toNumericWrapperImpl[T, N]
+}
+
+object DefaultConstraints extends DefaultConstraints {
+  import scala.reflect.macros.blackbox
+  import scala.language.experimental.macros
+
+  def toStringWrapperImpl[T: c.WeakTypeTag](c: blackbox.Context)(value: c.Tree): c.Tree = {
+    import c.universe._
+
+    val q"$obj.$memberName" = value
+    q"StringWrapper(${memberName.decodedName.toString})"
+  }
+
+  def toNumericWrapperImpl[T: c.WeakTypeTag, N: c.WeakTypeTag](c: blackbox.Context)(value: c.Tree)(ev: c.Tree): c.Tree = {
+    import c.universe._
+
+    val q"$obj.$memberName" = value
+    q"NumericWrapper(${memberName.decodedName.toString})"
+
+  }
+}
+
+trait Mappable[T] {
+  def toMap(obj: T): Map[String, () => Any]
+}
+
+object Mappable {
+  import scala.reflect.macros.blackbox
+  import scala.language.experimental.macros
+
+  implicit def materialize[T]: Mappable[T] = macro materializeImpl[T]
+
+  // TODO: differentiate between case classes and regular classes
   def materializeImpl[T: c.WeakTypeTag](c: blackbox.Context): c.Tree = {
     import c.universe._
 
@@ -102,13 +134,9 @@ object Validatable {
     }
 
     q"""
-        new Validatable[$tpe] {
-          def getValue(obj: $tpe, memberName: String): Any = {
-            val membersMap = Map(..$mappings)
-            val fn = membersMap(memberName)
-            fn()
-          }
-        }
-      """
+      new Mappable[$tpe] {
+        def toMap(obj: $tpe) = Map(..$mappings)
+      }
+    """
   }
 }
