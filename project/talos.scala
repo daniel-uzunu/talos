@@ -22,7 +22,7 @@ object BuildSettings {
     organization := "com.danieluzunu",
     version := buildVersion,
     scalaVersion := "2.11.7",
-    scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-target:jvm-1.7"))
+    scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-target:jvm-1.8"))
 }
 
 object TalosBuild extends Build {
