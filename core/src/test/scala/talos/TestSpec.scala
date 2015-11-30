@@ -8,7 +8,31 @@ class TestSpec extends FunSpec with Matchers {
 
   case class Account(currency: String, amount: Double)
 
-  describe("null checks") {}
+  class RegularClass(val bar: String)
+
+  /*
+  TODO
+  regular expressions
+  object members
+  extensibility
+   */
+
+  describe("null checks") {
+    import talos.DefaultConstraints._
+
+    it("should not allow nulls for validated fields") {
+      implicit val c = constraint[Person](p => p.lastName.isRequired)
+
+      validate(Person("John", null)) shouldEqual Failure
+    }
+
+    it("should not allow null for all fields - case classes") {
+      implicit val c = constraint[Person](p => p.lastName.isRequired)
+
+      validate(Person("John", null)) shouldEqual Failure
+      validate(Person(null, "Doe")) shouldEqual Failure
+    }
+  }
 
   describe("range checks") {
     import DefaultConstraints._
@@ -93,6 +117,18 @@ class TestSpec extends FunSpec with Matchers {
 
   describe("Composite validations") {
 
+  }
+
+  describe("regular classes") {
+    import talos.DefaultConstraints._
+
+    it("should work") {
+      implicit val c = constraint[RegularClass](obj => obj.bar.isRequired)
+
+      validate(new RegularClass("foo")) shouldEqual Success
+      validate(new RegularClass(null)) shouldEqual Failure
+      validate(new RegularClass("")) shouldEqual Failure
+    }
   }
 
   describe("Simple Validations") {

@@ -29,7 +29,12 @@ sealed trait Constraint[T] {
 
 sealed trait MemberConstraint[T, U] extends Constraint[T] {
   def memberName: String
-  override def verify(map: Map[String, () => Any]) = verify(map(memberName)().asInstanceOf[U])
+
+  override def verify(map: Map[String, () => Any]) = {
+    val memberValue = map(memberName)()
+    memberValue != null && verify(memberValue.asInstanceOf[U])
+  }
+
   def verify(value: U): Result
 }
 
@@ -109,33 +114,45 @@ object DefaultConstraints extends DefaultConstraints {
 
 trait Mappable[T] {
   def toMap(obj: T): Map[String, () => Any]
+  def isCaseClass: Boolean
 }
 
+import scala.reflect.macros.blackbox
+import scala.language.experimental.macros
+
 object Mappable {
-  import scala.reflect.macros.blackbox
-  import scala.language.experimental.macros
+  implicit def materialize[T]: Mappable[T] = macro MappableImpl.materializeImpl[T]
+}
 
-  implicit def materialize[T]: Mappable[T] = macro materializeImpl[T]
+class MappableImpl(val c: blackbox.Context) {
 
-  // TODO: differentiate between case classes and regular classes
-  def materializeImpl[T: c.WeakTypeTag](c: blackbox.Context): c.Tree = {
-    import c.universe._
+  import c.universe._
 
+  def materializeImpl[T: c.WeakTypeTag]: c.Tree = {
     val tpe = weakTypeOf[T]
 
-    val selectedMembers = tpe.members.filter { member =>
-      member.isPublic && member.isMethod &&
-        !member.isConstructor && !member.typeSignature.takesTypeArgs &&
-        (member.typeSignature.paramLists.isEmpty || member.typeSignature.paramLists.head.isEmpty)
+    if (!tpe.typeSymbol.isClass) {
+      // TODO: throw exception
     }
 
-    val mappings = selectedMembers.map { member =>
-      q"${member.name.decodedName.toString} -> obj.$member _"
-    }
+    val isCaseClass = tpe.typeSymbol.asInstanceOf[ClassSymbol].isCaseClass
+
+    val mappings = tpe.members
+      .collect {
+        case m: MethodSymbol => m
+      }
+      .filter {
+        if (isCaseClass) m => m.isCaseAccessor
+        else m => m.isPublic && m.paramLists.isEmpty && !m.isConstructor && m.typeParams.isEmpty
+      }
+      .map { member =>
+        q"${member.name.decodedName.toString} -> obj.$member _"
+      }
 
     q"""
       new Mappable[$tpe] {
         def toMap(obj: $tpe) = Map(..$mappings)
+        def isCaseClass = $isCaseClass
       }
     """
   }
