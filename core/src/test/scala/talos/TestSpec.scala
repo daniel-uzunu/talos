@@ -1,6 +1,7 @@
 package talos
 
 import org.scalatest.{Matchers, FunSpec}
+import ConstraintsValidator.validate
 
 class TestSpec extends FunSpec with Matchers {
   case class Person(firstName: String, lastName: String, age: Int = 18)
