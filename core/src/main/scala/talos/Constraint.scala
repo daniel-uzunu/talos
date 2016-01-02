@@ -18,3 +18,5 @@ case class RangeConstraint[T, N: Numeric](memberName: String, min: Option[N], ma
 
   val n = implicitly[Numeric[N]]
 }
+
+case class RefConstraint[T, U](memberName: String, constraint: Constraint[U]) extends MemberConstraint[T, U]

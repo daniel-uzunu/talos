@@ -26,13 +26,6 @@ class TestSpec extends FunSpec with Matchers {
 
       validate(Person("John", null)) shouldEqual Failure
     }
-
-    it("should not allow null for all fields - case classes") {
-      implicit val c = constraint[Person](p => p.lastName.isRequired)
-
-      validate(Person("John", null)) shouldEqual Failure
-      validate(Person(null, "Doe")) shouldEqual Failure
-    }
   }
 
   describe("range checks") {
@@ -118,6 +111,24 @@ class TestSpec extends FunSpec with Matchers {
 
   describe("Composite validations") {
 
+    object MyConstraints extends DefaultConstraints {
+      implicit val personConstraint = constraint[Person] { p =>
+        p.firstName.isRequired && p.lastName.isRequired && p.age.minValue(21)
+      }
+
+      implicit val postConstraint = constraint[Post] { p =>
+        p.title.isRequired && p.author.isValid
+      }
+    }
+
+    import MyConstraints._
+
+    it("should validate object members") {
+      validate(Post("test", Person("John", "Doe", 23))) shouldEqual Success
+      validate(Post("", Person("John", "Doe", 23))) shouldEqual Failure
+      validate(Post("test", Person("", "Doe", 23))) shouldEqual Failure
+      validate(Post("test", Person("John", "Doe"))) shouldEqual Failure
+    }
   }
 
   describe("regular classes") {

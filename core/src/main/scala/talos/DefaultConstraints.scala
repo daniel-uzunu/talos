@@ -16,6 +16,8 @@ trait DefaultConstraints {
 
   implicit def toNumericWrapper[T, N](value: N)(implicit ev: Numeric[N]): NumericWrapper[T, N] =
     macro DefaultConstraintsImpl.toNumericWrapper[T, N]
+
+  implicit def toAnyRefWrapper[T, U](value: U): AnyRefWrapper[T, U] = macro DefaultConstraintsImpl.toAnyRefWrapper[T, U]
 }
 
 object DefaultConstraints extends DefaultConstraints
@@ -31,19 +33,25 @@ case class NumericWrapper[T, N: Numeric](memberName:  String) {
   def maxValue(max: N): Constraint[T] = RangeConstraint(memberName, None, Some(max), None)
 }
 
-object DefaultConstraintsImpl {
-  def toStringWrapper[T: c.WeakTypeTag](c: blackbox.Context)(value: c.Tree): c.Tree = {
-    import c.universe._
+case class AnyRefWrapper[T, U](memberName: String) {
+  def isValid(implicit c: Constraint[U]): Constraint[T] = RefConstraint(memberName, c)
+}
 
+class DefaultConstraintsImpl(val c: blackbox.Context) {
+  import c.universe._
+
+  def toStringWrapper[T: c.WeakTypeTag](value: c.Tree): c.Tree = {
     val q"$obj.$memberName" = value
     q"StringWrapper(${memberName.decodedName.toString})"
   }
 
-  def toNumericWrapper[T: c.WeakTypeTag, N: c.WeakTypeTag](c: blackbox.Context)(value: c.Tree)(ev: c.Tree): c.Tree = {
-    import c.universe._
-
+  def toNumericWrapper[T: c.WeakTypeTag, N: c.WeakTypeTag](value: c.Tree)(ev: c.Tree): c.Tree = {
     val q"$obj.$memberName" = value
     q"NumericWrapper(${memberName.decodedName.toString})"
+  }
 
+  def toAnyRefWrapper[T: c.WeakTypeTag, U: c.WeakTypeTag](value: c.Tree): c.Tree = {
+    val q"$obj.$memberName" = value
+    q"AnyRefWrapper(${memberName.decodedName.toString})"
   }
 }
