@@ -24,6 +24,7 @@ object DefaultConstraints extends DefaultConstraints
 
 case class StringWrapper[T](memberName: String) {
   def isRequired: Constraint[T] = NotEmptyConstraint(memberName)
+  def pattern(regex: String): Constraint[T] = PatternConstraint(memberName, regex)
 }
 
 case class NumericWrapper[T, N: Numeric](memberName:  String) {

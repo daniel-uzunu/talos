@@ -13,6 +13,8 @@ sealed trait MemberConstraint[T, +U] extends Constraint[T] {
 
 case class NotEmptyConstraint[T](memberName: String) extends MemberConstraint[T, String]
 
+case class PatternConstraint[T](memberName: String, pattern: String) extends MemberConstraint[T, String]
+
 case class RangeConstraint[T, N: Numeric](memberName: String, min: Option[N], max: Option[N], step: Option[N])
     extends MemberConstraint[T, N] {
 

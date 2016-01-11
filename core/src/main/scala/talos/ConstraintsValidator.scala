@@ -38,7 +38,8 @@ object ConstraintsValidator {
   }
 
   private def checkMemberConstraint[T, U](c: MemberConstraint[T, U], value: U): Result = c match {
-    case notEqualConstraint: NotEmptyConstraint[T] => value.asInstanceOf[String] != ""
+    case notEmptyConstraint: NotEmptyConstraint[T] => value.asInstanceOf[String] != ""
+    case patternConstraint: PatternConstraint[T] => value.asInstanceOf[String].matches(patternConstraint.pattern)
     case refConstraint: RefConstraint[T, U] => validate(value)(refConstraint.constraint)
     case rangeConstraint: RangeConstraint[T, U] =>
       import Ordering.Implicits._

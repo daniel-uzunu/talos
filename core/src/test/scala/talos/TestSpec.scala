@@ -14,7 +14,7 @@ class TestSpec extends FunSpec with Matchers {
   /*
   TODO
   regular expressions
-  object members
+  minLength, maxLength
   extensibility
    */
 
@@ -106,6 +106,14 @@ class TestSpec extends FunSpec with Matchers {
       validate(Person("John", "Doe")) shouldEqual Success
       validate(Person("John", "")) shouldEqual Success
       validate(Person("", "Doe")) shouldEqual Failure
+    }
+
+    it("should match a regular expression") {
+      implicit val c = constraint[Person](p => p.firstName.pattern("[A-Z][a-z]+"))
+
+      validate(Person("John", "Doe")) shouldEqual Success
+      validate(Person("john", "Doe")) shouldEqual Failure
+      validate(Person("123", "Doe")) shouldEqual Failure
     }
   }
 
