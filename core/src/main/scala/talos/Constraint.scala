@@ -15,6 +15,10 @@ case class NotEmptyConstraint[T](memberName: String) extends MemberConstraint[T,
 
 case class PatternConstraint[T](memberName: String, pattern: String) extends MemberConstraint[T, String]
 
+case class MinLengthConstraint[T](memberName: String, minLength: Int) extends MemberConstraint[T, String]
+
+case class MaxLengthConstraint[T](memberName: String, maxLength: Int) extends MemberConstraint[T, String]
+
 case class RangeConstraint[T, N: Numeric](memberName: String, min: Option[N], max: Option[N], step: Option[N])
     extends MemberConstraint[T, N] {
 

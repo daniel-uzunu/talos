@@ -115,6 +115,20 @@ class TestSpec extends FunSpec with Matchers {
       validate(Person("john", "Doe")) shouldEqual Failure
       validate(Person("123", "Doe")) shouldEqual Failure
     }
+
+    it("should have a minimum length") {
+      implicit val c = constraint[Person](p => p.firstName.minLength(3))
+
+      validate(Person("John", "Doe")) shouldEqual Success
+      validate(Person("J", "Doe")) shouldEqual Failure
+    }
+
+    it("should have a maximum length") {
+      implicit val c = constraint[Person](p => p.firstName.maxLength(3))
+
+      validate(Person("J", "Doe")) shouldEqual Success
+      validate(Person("John", "Doe")) shouldEqual Failure
+    }
   }
 
   describe("Composite validations") {

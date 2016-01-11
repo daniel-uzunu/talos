@@ -25,6 +25,8 @@ object DefaultConstraints extends DefaultConstraints
 case class StringWrapper[T](memberName: String) {
   def isRequired: Constraint[T] = NotEmptyConstraint(memberName)
   def pattern(regex: String): Constraint[T] = PatternConstraint(memberName, regex)
+  def minLength(minLength: Int): Constraint[T] = MinLengthConstraint(memberName, minLength)
+  def maxLength(maxLength: Int): Constraint[T] = MaxLengthConstraint(memberName, maxLength)
 }
 
 case class NumericWrapper[T, N: Numeric](memberName:  String) {
