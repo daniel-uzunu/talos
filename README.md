@@ -18,7 +18,7 @@ object MyConstraints extends DefaultConstraints {
   }
 
   implicit val postConstraint = constraint[Book] { b =>
-    b.title.isRequired && b.author.isValid b.year.isInRange(1900, 2030)
+    b.title.isRequired && b.author.isValid && b.year.isInRange(1900, 2030)
   }
 }
 ```
